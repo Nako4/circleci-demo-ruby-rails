@@ -69,26 +69,26 @@ jobs:
           paths:
             - ~/.cache/yarn
       
-      #テストデータベースの設定
-      - run:
-          name:DBの待機
-          command:dockerize -wait tcp://localhost:5432 -timeout 1m
+      # #テストデータベースの設定
+      # - run:
+      #     name:DBの待機
+      #     command:dockerize -wait tcp://localhost:5432 -timeout 1m
           
-      - run:
-          name:DBのセットアップ
-          command:bin/rails db:schema:load --trace
+      # - run:
+      #     name:DBのセットアップ
+      #     command:bin/rails db:schema:load --trace
 
-      # Rspecを並列実行する
-      - run: |
-          bundle exec rspec --profile 10 \
-                            --format RspecJunitFormatter \
-                            --out test_results/rspec.xml \
-                            --format progress \
-                            $(circleci tests glob "spec/**/*_spec.rb" | circleci tests split --split-by=timings)
+      # # Rspecを並列実行する
+      # - run: |
+      #     bundle exec rspec --profile 10 \
+      #                       --format RspecJunitFormatter \
+      #                       --out test_results/rspec.xml \
+      #                       --format progress \
+      #                       $(circleci tests glob "spec/**/*_spec.rb" | circleci tests split --split-by=timings)
 
-      # タイミング解析のテスト結果を保存する
-      - store_test_results:
-            path: test_results
+      # # タイミング解析のテスト結果を保存する
+      # - store_test_results:
+      #       path: test_results
       # - run:
       #     name: Which bundler?
       #     command: bundle -v
