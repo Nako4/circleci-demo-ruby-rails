@@ -1,57 +1,82 @@
 version: 2.1
-
 orbs:
-  ruby: circleci/ruby@1.1.0
-  node: circleci/node@2
+  ruby: circleci/ruby@0.1.2 
 
 jobs:
   build:
+    working_directory: ~/circleci-demo-ruby-rails
     docker:
-      - image: cimg/ruby:2.7-node
-    steps:
-      - checkout
-      - ruby/install-deps
-      # Store bundle cache
-      - node/install-packages:
-          pkg-manager: yarn
-          cache-key: "yarn.lock"
-  test:
-    parallelism: 3
-    docker:
-      - image: cimg/ruby:2.7-node
+      - image: circleci/ruby:2.4.2-jessie-node
+        environment:
+          BUNDLE_JOBS: 3
+          BUNDLE_RETRY: 3
+          BUNDLE_PATH: vendor/bundle
+          PGHOST: 127.0.0.1
+          PGUSER: circleci-demo-ruby
+          RAILS_ENV: test
       - image: circleci/postgres:9.5-alpine
         environment:
           POSTGRES_USER: circleci-demo-ruby
-          POSTGRES_DB: rails_blog_test
+          POSTGRES_DB: rails_blog
           POSTGRES_PASSWORD: ""
-    environment:
-      BUNDLE_JOBS: "3"
-      BUNDLE_RETRY: "3"
-      PGHOST: 127.0.0.1
-      PGUSER: circleci-demo-ruby
-      PGPASSWORD: ""
-      RAILS_ENV: test
     steps:
+      # working_directoryにリポジトリをpull
       - checkout
-      - ruby/install-deps
-      - node/install-packages:
-          pkg-manager: yarn
-          cache-key: "yarn.lock"
-      - run:
-          name: Wait for DB
-          command: dockerize -wait tcp://localhost:5432 -timeout 1m
-      - run:
-          name: Database setup
-          command: bundle exec rails db:schema:load --trace
-      # Run rspec in parallel
-      - ruby/rspec-test
-      - ruby/rubocop-check
 
-workflows:
-  version: 2
-  build_and_test:
-    jobs:
-      - build
-      - test:
-          requires:
-            - build
+      #bundle cacheを復元する
+      - restore_cache:
+          keys:
+            - rails-demo-bundle-v2-{{ checksum "Gemfile.lock" }}
+            - rails-demo-bundle-v2-
+
+      - run:
+          name: バンドル インストール
+          command: bundle check --path vendor/bundle || bundle install --deployment
+      
+      # buncle cacheを保存する
+      - save_cache:
+          key: rails-demo-bundle-v2-{{ checksum "Gemfile.lock" }}
+          paths:
+          - vendor/bundle
+      
+      # アプリでWebpackerまたｈ Yarnを使う場合に必要
+
+      - restore_cache:
+          keys:
+            - rails-demo-yarn-{{ checksum "yarn.lock" }}
+            - rails-demo-yarn-
+
+      - run:
+          name: Yarnのインストール
+          command: yarn install --cache-folder ~/.cache/yarn
+      
+      #YarnまたはWebpackerのキャッシュを保存する
+      - save_cache:
+          key: rails-demo-yarn-{{ checksum "yarn.lock" }}
+          paths:
+            - ~/.cache/yarn
+      
+      #テストデータベースの設定
+      - run:
+          name:DBの待機
+          command:dockerize -wait tcp://localhost:5432 -timeout 1m
+          
+      - run:
+          name:DBのセットアップ
+          command:bin/rails db:schema:load --trace
+
+      # Rspecを並列実行する
+      - run: |
+          bundle exec rspec --profile 10 \
+                            --format RspecJunitFormatter \
+                            --out test_results/rspec.xml \
+                            --format progress \
+                            $(circleci tests glob "spec/**/*_spec.rb" | circleci tests split --split-by=timings)
+
+      # タイミング解析のテスト結果を保存する
+      - store_test_results:
+            path: test_results
+      # - run:
+      #     name: Which bundler?
+      #     command: bundle -v
+      # - ruby/bundle-install
