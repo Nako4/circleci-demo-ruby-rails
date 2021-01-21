@@ -38,8 +38,14 @@ jobs:
 
       - run:
           name: バンドル インストール
-          command: bundle check --path vendor/bundle || bundle install --deployment
-      
+          # command: bundle check --path vendor/bundle || bundle install --deployment
+          command: |
+            sudo gem update --system
+            sudo gem uninstall bundler
+            sudo rm /usr/local/bin/bundle
+            sudo rm /usr/local/bin/bundler
+            sudo gem install bundler
+            
       # buncle cacheを保存する
       - save_cache:
           key: rails-demo-bundle-v2-{{ checksum "Gemfile.lock" }}
